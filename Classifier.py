@@ -11,3 +11,7 @@ class Classifier:
 	@abstractmethod
 	def buildClassifier(self, X_features, Y_train):
 		pass
+
+	#This is the abstract method that is implemented by the subclasses.
+	def getName(self):
+		return self.__class__.__name__

@@ -12,3 +12,5 @@ class Featurizer:
 	def getFeatureRepresentation(self, X_train, X_val):
 		pass
 
+	def getName(self):
+		return self.__class__.__name__
