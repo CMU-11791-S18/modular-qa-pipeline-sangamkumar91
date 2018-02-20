@@ -1,6 +1,7 @@
 import sys
 import json
 import time
+import numpy as np
 
 from sklearn.externals import joblib
 
@@ -34,34 +35,51 @@ class Pipeline(object):
 		X = []
 		Y = []
 		for question in dataQuestions:
-
 			long_snippets = self.retrievalInstance.getLongSnippets(question)
 			short_snippets = self.retrievalInstance.getShortSnippets(question)
-
 			X.append(short_snippets)
 			Y.append(question['answers'][0])
-
 		return X, Y
 
 
 	def question_answering(self):
 		dataset_type = self.trainData['origin']
 		candidate_answers = self.trainData['candidates']
-		X_train, Y_train = self.makeXY(self.trainData['questions'][0:10])
+		X_train, Y_train = self.makeXY(self.trainData['questions'][0:3000])
 		X_val, Y_val_true = self.makeXY(self.valData['questions'])
+		np_Y_val_true = np.array(Y_val_true)
 
+		self.correct_answers = {}
 		self.result = [['Featurizer','Classifier','Accuracy','Precision','Recall','F-Measure']]
 		for featurizerInstance in featurizerInstances:
 			X_features_train, X_features_val = featurizerInstance.getFeatureRepresentation(X_train, X_val)
 			for classifierInstance in classifierInstances:
 				#featurization
 				clf = classifierInstance.buildClassifier(X_features_train, Y_train)
+
 				#Prediction
 				Y_val_pred = clf.predict(X_features_val)
+
+				np_Y_val_pred = np.array(Y_val_pred)
+				correct_answers_elem = np.equal(np_Y_val_true, np_Y_val_pred)
+				self.correct_answers[featurizerInstance.getName()+'_'+classifierInstance.getName())] = correct_answers_elem
 				self.evaluatorInstance = Evaluator()
 				a =  self.evaluatorInstance.getAccuracy(Y_val_true, Y_val_pred)
 				p,r,f = self.evaluatorInstance.getPRF(Y_val_true, Y_val_pred)
 				self.result.append([featurizerInstance.getName(),classifierInstance.getName(),str(a),str(p),str(r),str(f)])
+
+	def genarate_analysis(self) :
+		self.report_analysis = []
+		completed_pairs = []
+		for akey, avalue  in self.correct_answers:
+			completed_pairs.append(akey)
+			for bkey, bvalue  in self.correct_answers:
+				if bkey in completed_pairs:
+					continue
+				else:
+					continue
+
+
 
 	def generate_html(self,result):
 		ts = time.gmtime()
