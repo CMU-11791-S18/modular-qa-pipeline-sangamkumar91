@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from sklearn.externals import joblib
+from functools import reduce
 
 from Retrieval import Retrieval
 from Featurizer import Featurizer
@@ -27,6 +28,7 @@ class Pipeline(object):
 		self.valData = json.load(valfile)
 		valfile.close()
 		self.question_answering()
+		self.genarate_analysis()
 		outfile = open("resultsTable.html","w")
 		outfile.write(self.generate_html(self.result))
 		outfile.close()
@@ -45,41 +47,94 @@ class Pipeline(object):
 	def question_answering(self):
 		dataset_type = self.trainData['origin']
 		candidate_answers = self.trainData['candidates']
-		X_train, Y_train = self.makeXY(self.trainData['questions'][0:3000])
-		X_val, Y_val_true = self.makeXY(self.valData['questions'])
+		X_train, Y_train = self.makeXY(self.trainData['questions'][0:1000])
+		X_val, Y_val_true = self.makeXY(self.valData['questions'][0:1000])
 		np_Y_val_true = np.array(Y_val_true)
 
 		self.correct_answers = {}
 		self.result = [['Featurizer','Classifier','Accuracy','Precision','Recall','F-Measure']]
 		for featurizerInstance in featurizerInstances:
+			print("Features Created for :" + featurizerInstance.getName())
 			X_features_train, X_features_val = featurizerInstance.getFeatureRepresentation(X_train, X_val)
 			for classifierInstance in classifierInstances:
 				#featurization
 				clf = classifierInstance.buildClassifier(X_features_train, Y_train)
-
+				print("Classifier Created for :" + classifierInstance.getName())
 				#Prediction
 				Y_val_pred = clf.predict(X_features_val)
-
 				np_Y_val_pred = np.array(Y_val_pred)
-				correct_answers_elem = np.equal(np_Y_val_true, np_Y_val_pred)
-				self.correct_answers[featurizerInstance.getName()+'_'+classifierInstance.getName())] = correct_answers_elem
+				correct_answers_elem = [Y_val_pred[i] == Y_val_true[i] for i in range(len(Y_val_true))]
+				self.correct_answers[featurizerInstance.getName()+'|'+classifierInstance.getName()] = correct_answers_elem
 				self.evaluatorInstance = Evaluator()
 				a =  self.evaluatorInstance.getAccuracy(Y_val_true, Y_val_pred)
 				p,r,f = self.evaluatorInstance.getPRF(Y_val_true, Y_val_pred)
 				self.result.append([featurizerInstance.getName(),classifierInstance.getName(),str(a),str(p),str(r),str(f)])
 
 	def genarate_analysis(self) :
+		ts = time.gmtime()
+		tsf = time.strftime("%Y-%m-%d %H:%M:%S", ts)
+		table = "<html><head><title>QA Pipeline with Learning " + tsf + "    - Comparison Analysis</title></head><body><h2>" + tsf + " QA Pipeline with Learning - Comparison Analysis</h2>\n<table>\n"
 		self.report_analysis = []
 		completed_pairs = []
-		for akey, avalue  in self.correct_answers:
+		for akey, avalue  in self.correct_answers.items():
 			completed_pairs.append(akey)
-			for bkey, bvalue  in self.correct_answers:
+			for bkey, bvalue  in self.correct_answers.items():
 				if bkey in completed_pairs:
 					continue
 				else:
-					continue
+					arr00 = []
+					arr11 = []
+					arr01 = []
+					arr10 = []
+					for i in range(len(avalue)):
+						if avalue[i] == True and bvalue[i] == True:
+							arr11.append(i)
+						elif avalue[i] == True and bvalue[i] == False:
+							arr10.append(i)
+						elif avalue[i] == False and bvalue[i] == True:
+							arr01.append(i)
+						else:
+							arr00.append(i)
+
+					self.report_analysis.append((akey,bkey,arr00,arr01,arr10,arr11))
+
+					print('Comparison Between :-')
+					print('S : Classifier : ' + akey.split('|')[0] + ' Featurizer :' + akey.split('|')[1])
+					print('S* : Classifier : ' + bkey.split('|')[0] + ' Featurizer :' + bkey.split('|')[1])
+					print('No.of Tough Inputs' + str(len(arr00)))
+					print('No.of Easy Inputs' + str(len(arr11)))
+					print('No.of Improvements' + str(len(arr01)))
+					print('No.of Regeression' + str(len(arr10)))
+					print('\n\n\n')
+
+		self.find_tough_for_all()
+		self.find_easy_for_all()
+
+	def find_tough_for_all(self):
+		parent_arr = list(range(len(self.valData['questions'][1:3000])))
+		for analysis in self.report_analysis:
+			parent_arr = np.intersect1d(parent_arr,analysis[2]).tolist()
+
+		print("\n Indexes of Tough Questions for all models : \n")
+		print(parent_arr)
+
+		print("\n Example of Tough Question at index 1 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))
+		print("\n Example of Tough Question at index 2 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[2]]))
 
 
+	def find_easy_for_all(self):
+		parent_arr = list(range(len(self.valData['questions'][1:1000])))
+		for analysis in self.report_analysis:
+			parent_arr = np.intersect1d(parent_arr,analysis[5]).tolist()
+		print("\n Indexes of Easy Questions for all models : \n")
+		print(parent_arr)
+
+		print("\n Example of Easy Question at index 1 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))
+		print("\n Example of Easy Question at index 2 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[2]]))
 
 	def generate_html(self,result):
 		ts = time.gmtime()

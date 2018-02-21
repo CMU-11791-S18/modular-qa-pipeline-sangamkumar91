@@ -15,11 +15,11 @@ class Evaluator:
 	def getAccuracy(self, Y_true, Y_pred):
 		accuracy = accuracy_score(Y_true, Y_pred)
 		return accuracy
-	
-	#This is a class method that gets precision, recall and f-measure of the model	
+
+	#This is a class method that gets precision, recall and f-measure of the model
 	@classmethod
 	def getPRF(self, Y_true, Y_pred):
-		prf = precision_recall_fscore_support(Y_true, Y_pred, average='micro')
+		prf = precision_recall_fscore_support(Y_true, Y_pred, average='macro')
 		precision = prf[0]
 		recall = prf[1]
 		f_measure = prf[2]
