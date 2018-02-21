@@ -16,6 +16,15 @@ from MultinomialNaiveBayes import MultinomialNaiveBayes
 from SupportVectorMachine import SupportVectorMachine
 from Evaluator import Evaluator
 
+
+TRAINING_DATA={
+	'test_size' : 1000
+}
+
+VAL_DATA = {
+	'test_size' : 1000
+}
+
 class Pipeline(object):
 	def __init__(self, trainFilePath, valFilePath, retrievalInstance, featurizerInstance, classifierInstance):
 		self.retrievalInstance = retrievalInstance
@@ -47,8 +56,8 @@ class Pipeline(object):
 	def question_answering(self):
 		dataset_type = self.trainData['origin']
 		candidate_answers = self.trainData['candidates']
-		X_train, Y_train = self.makeXY(self.trainData['questions'][0:1000])
-		X_val, Y_val_true = self.makeXY(self.valData['questions'][0:1000])
+		X_train, Y_train = self.makeXY(self.trainData['questions'][0:TRAINING_DATA['test_size']])
+		X_val, Y_val_true = self.makeXY(self.valData['questions'][0:VAL_DATA['test_size']])
 		np_Y_val_true = np.array(Y_val_true)
 
 		self.correct_answers = {}
@@ -73,7 +82,10 @@ class Pipeline(object):
 	def genarate_analysis(self) :
 		ts = time.gmtime()
 		tsf = time.strftime("%Y-%m-%d %H:%M:%S", ts)
-		table = "<html><head><title>QA Pipeline with Learning " + tsf + "    - Comparison Analysis</title></head><body><h2>" + tsf + " QA Pipeline with Learning - Comparison Analysis</h2>\n<table>\n"
+		table = "<html><head><title>Comparison Analysis</title></head><body><h1>" + tsf + " QA Pipeline with Learning - Comparison Analysis</h1>\n\n"
+		table = table + '<br></br><br></br><br></br><p> Training size'+ str(TRAINING_DATA['test_size']) +'</p>'
+		table = table + '<br></br><p> Validation size'+ str(VAL_DATA['test_size']) +'</p>'
+
 		self.report_analysis = []
 		completed_pairs = []
 		for akey, avalue  in self.correct_answers.items():
@@ -98,6 +110,14 @@ class Pipeline(object):
 
 					self.report_analysis.append((akey,bkey,arr00,arr01,arr10,arr11))
 
+					table = table + "<br></br><br></br><br></br>\n\n"
+					table = table + '<h2>S : Classifier : ' + akey.split('|')[0] + ' Featurizer :' + akey.split('|')[1] + '</h2>\n\n'
+					table = table + '<h2>S* : Classifier : ' + bkey.split('|')[0] + ' Featurizer :' + bkey.split('|')[1] + '</h2>\n\n'
+					table = table + "<p>"+'No.of Tough Inputs' + str(len(arr00))+"</p>\n\n"
+					table = table + "<p>"+'No.of Easy Inputs' + str(len(arr11))+"</p>\n\n"
+					table = table + "<p>"+'No.of Improvements' + str(len(arr01))+"</p>\n\n"
+					table = table + "<p>"+'No.of Regeression' + str(len(arr10))+"</p>\n\n"
+
 					print('Comparison Between :-')
 					print('S : Classifier : ' + akey.split('|')[0] + ' Featurizer :' + akey.split('|')[1])
 					print('S* : Classifier : ' + bkey.split('|')[0] + ' Featurizer :' + bkey.split('|')[1])
@@ -107,39 +127,75 @@ class Pipeline(object):
 					print('No.of Regeression' + str(len(arr10)))
 					print('\n\n\n')
 
-		self.find_tough_for_all()
-		self.find_easy_for_all()
+		table = table + self.find_tough_for_all()
+		table = table + self.find_easy_for_all()
+		table += "</body>\n</html>\n";
+		outfile = open("resultsAnalysis.html","w")
+		outfile.write(table)
+		outfile.close()
+
 
 	def find_tough_for_all(self):
-		parent_arr = list(range(len(self.valData['questions'][1:3000])))
+
+		parent_arr = list(range(len(self.valData['questions'][0:VAL_DATA['test_size']])))
 		for analysis in self.report_analysis:
 			parent_arr = np.intersect1d(parent_arr,analysis[2]).tolist()
 
 		print("\n Indexes of Tough Questions for all models : \n")
 		print(parent_arr)
+		table = '<h1>\n Indexes of Tough Questions for all models : \n</h1>'
+		table = table + '<p>' + str(parent_arr)+'</p>'
+		table = table + '<p> Total Number of tough Questions: ' + str(len(parent_arr))+'</p>'
 
+		if len(parent_arr) < 1:
+			table = table + '<p>No Tough Questions Available</p>'
+			return table
+		print("\n Example of Tough Question at index 0 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[0]]))
+		table = table + '<h1>\n Example of Tough Question at index 0 : \n</h1>'
+		table = table + '<p>' + str(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[0]]))+'</p>'
+
+		if len(parent_arr) < 2:
+			return table
 		print("\n Example of Tough Question at index 1 : \n")
 		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))
-		print("\n Example of Tough Question at index 2 : \n")
-		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[2]]))
-
+		table = table + '<h1>\n Example of Tough Question at index 1 : \n</h1>'
+		table = table + '<p>' + str(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))+'</p>'
+		return table
 
 	def find_easy_for_all(self):
-		parent_arr = list(range(len(self.valData['questions'][1:1000])))
+		parent_arr = list(range(len(self.valData['questions'][0:VAL_DATA['test_size']])))
 		for analysis in self.report_analysis:
 			parent_arr = np.intersect1d(parent_arr,analysis[5]).tolist()
 		print("\n Indexes of Easy Questions for all models : \n")
 		print(parent_arr)
+		table = '<h1>\n Indexes of Easy Questions for all models : \n</h1>'
+		table = table + '<p>' + str(parent_arr)+'</p>'
+		table = table + '<p> Total Number of Easy Questions: ' + str(len(parent_arr))+'</p>'
 
+		if len(parent_arr) < 1:
+			table = table + '<p>No Easy Questions Available</p>'
+			return table
+		print("\n Example of Easy Question at index 0 : \n")
+		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[0]]))
+		table = table + '<h1>\n Example of Easy Question at index 0 : \n</h1>'
+		table = table + '<p>' + str(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[0]]))+'</p>'
+
+		if len(parent_arr) < 2:
+			return table
 		print("\n Example of Easy Question at index 1 : \n")
 		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))
-		print("\n Example of Easy Question at index 2 : \n")
-		print(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[2]]))
+		table = table + '<h1>\n Example of Easy Question at index 1 : \n</h1>'
+		table = table + '<p>' + str(self.retrievalInstance.getShortSnippets(self.valData['questions'][parent_arr[1]]))+'</p>'
+		return table
 
 	def generate_html(self,result):
 		ts = time.gmtime()
 		tsf = time.strftime("%Y-%m-%d %H:%M:%S", ts)
-		table = "<html><head><title>QA Pipeline with Learning " + tsf + "</title><link href=\"results.css\" rel=\"stylesheet\"></head><body><h2>" + tsf + " QA Pipeline with Learning</h2>\n<table>\n"
+		table = "<html><head><title>QA Pipeline with Learning " + tsf + "</title><link href=\"results.css\" rel=\"stylesheet\"></head><body><h2>" + tsf + " QA Pipeline with Learning</h2>\n"
+		table = table + '<br></br><br></br><br></br><p> Training size'+ str(TRAINING_DATA['test_size']) +'</p>'
+		table = table + '<br></br><p> Validation size'+ str(VAL_DATA['test_size']) +'</p>'
+		table =  table + "<table>\n"
 		for i,each_result in enumerate(result):
 			table += "<tr>"
 			if i == 0 :
